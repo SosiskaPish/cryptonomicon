@@ -1,6 +1,7 @@
 <template>
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
     <div class="container">
+      <div class="w-full my-4"></div>
       <section>
         <div class="flex">
           <div class="max-w-xs">
@@ -10,10 +11,13 @@
             <div class="mt-1 relative rounded-md shadow-md">
               <input
                 v-model="ticker"
+                @keydown.enter="add"
                 type="text"
                 name="wallet"
                 id="wallet"
                 class="
+                  py-1
+                  px-2
                   block
                   w-full
                   pr-10
@@ -22,80 +26,10 @@
                   focus:outline-none focus:ring-gray-500 focus:border-gray-500
                   sm:text-sm
                   rounded-md
-                  p-1
                 "
                 placeholder="Например DOGE"
               />
             </div>
-            <div
-              class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
-            >
-              <span
-                class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                BTC
-              </span>
-              <span
-                class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                DOGE
-              </span>
-              <span
-                class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                BCH
-              </span>
-              <span
-                class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                ETH
-              </span>
-            </div>
-            <div class="text-sm text-red-600">Такой тикер уже добавлен</div>
           </div>
         </div>
         <button
@@ -140,11 +74,74 @@
           Добавить
         </button>
       </section>
+
       <template v-if="tickers.length">
+        <hr class="w-full border-t border-gray-600 my-4" />
+        <div>
+          <button
+            class="
+              my-4
+              mx-2
+              inline-flex
+              items-center
+              py-2
+              px-4
+              border border-transparent
+              shadow-sm
+              text-sm
+              leading-4
+              font-medium
+              rounded-full
+              text-white
+              bg-gray-600
+              hover:bg-gray-700
+              transition-colors
+              duration-300
+              focus:outline-none
+              focus:ring-2
+              focus:ring-offset-2
+              focus:ring-gray-500
+            "
+            v-if="page > 1"
+            @click="page = page - 1"
+          >
+            Назад
+          </button>
+          <button
+            class="
+              my-4
+              mx-2
+              inline-flex
+              items-center
+              py-2
+              px-4
+              border border-transparent
+              shadow-sm
+              text-sm
+              leading-4
+              font-medium
+              rounded-full
+              text-white
+              bg-gray-600
+              hover:bg-gray-700
+              transition-colors
+              duration-300
+              focus:outline-none
+              focus:ring-2
+              focus:ring-offset-2
+              focus:ring-gray-500
+            "
+            @click="page = page + 1"
+            v-if="hasNextPage"
+          >
+            Вперед
+          </button>
+          <div>Фильтр: <input v-model="filter" /></div>
+        </div>
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="t in tickers"
+            v-for="t in filteredTickers()"
             :key="t.name"
             @click="select(t)"
             :class="{
@@ -251,58 +248,96 @@
 <script>
 export default {
   name: "App",
+
   data() {
     return {
       ticker: "",
       tickers: [],
-      filter: false,
-
       sel: null,
       graph: [],
-
-      coinList: [],
+      page: 1,
+      filter: "",
+      hasNextPage: true,
     }
   },
+
   created() {
+    const windowData = Object.fromEntries(
+      new URL(window.location).searchParams.entries()
+    )
+
+    if (windowData.filter) {
+      this.filter = windowData.filter
+    }
+
+    if (windowData.page) {
+      this.page = windowData.page
+    }
+
     const tickersData = localStorage.getItem("cryptonomicon-list")
+
     if (tickersData) {
       this.tickers = JSON.parse(tickersData)
       this.tickers.forEach((ticker) => {
-        this.subcribeToUpdates(ticker.name)
+        this.subscribeToUpdates(ticker.name)
       })
     }
   },
+
   methods: {
-    subcribeToUpdates(tickerName) {
+    filteredTickers() {
+      const start = (this.page - 1) * 6
+      const end = this.page * 6
+
+      const filteredTickers = this.tickers.filter((ticker) =>
+        ticker.name.includes(this.filter)
+      )
+
+      this.hasNextPage = filteredTickers.length > end
+
+      return filteredTickers.slice(start, end)
+    },
+
+    subscribeToUpdates(tickerName) {
       setInterval(async () => {
         const f = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=7f4f460334f56d02b536a87a10f7dbb84b2945658df6e04417fc15bdc39742b7`
+          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=ce3fd966e7a1d10d65f907b20bf000552158fd3ed1bd614110baa0ac6cb57a7e`
         )
         const data = await f.json()
-        console.log(data)
+
+        // currentTicker.price =  data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
         this.tickers.find((t) => t.name === tickerName).price =
           data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2)
+
         if (this.sel?.name === tickerName) {
           this.graph.push(data.USD)
         }
       }, 5000)
       this.ticker = ""
     },
+
     add() {
-      console.log(this.coinList.length)
       const currentTicker = {
         name: this.ticker,
         price: "-",
-        graph: [],
       }
+
       this.tickers.push(currentTicker)
+      this.filter = ""
 
       localStorage.setItem("cryptonomicon-list", JSON.stringify(this.tickers))
-      this.subcribeToUpdates(currentTicker.name)
+      this.subscribeToUpdates(currentTicker.name)
     },
+
+    select(ticker) {
+      this.sel = ticker
+      this.graph = []
+    },
+
     handleDelete(tickerToRemove) {
       this.tickers = this.tickers.filter((t) => t !== tickerToRemove)
     },
+
     normalizeGraph() {
       const maxValue = Math.max(...this.graph)
       const minValue = Math.min(...this.graph)
@@ -310,12 +345,24 @@ export default {
         (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
       )
     },
-    select(ticker) {
-      this.sel = ticker
-      this.graph = []
+  },
+
+  watch: {
+    filter() {
+      this.page = 1
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+      )
+    },
+    page() {
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+      )
     },
   },
 }
 </script>
-
-<style src="./assets/tailwind.css"></style>
