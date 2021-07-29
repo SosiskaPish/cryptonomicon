@@ -9,11 +9,13 @@
             <div class="mt-1 relative rounded-md shadow-md">
               <input
                 v-model="ticker"
+                @input="searchHandler"
                 @keydown.enter="add"
                 type="text"
                 name="wallet"
                 id="wallet"
                 class="
+                  p-1
                   block
                   w-full
                   pr-10
@@ -26,6 +28,31 @@
                 placeholder="Например DOGE"
               />
             </div>
+            <div
+              v-if="makeSuggestions().length"
+              class="flex bg-white shadow-md p-1 render-md shadow-md flex-wrap rounded-md"
+            >
+              <span
+                v-for="coinSuggest of makeSuggestions()"
+                :key="coinSuggest.id"
+                @click="addSuggest(coinSuggest)"
+                class="
+                  inline-flex
+                  items-center
+                  px-2
+                  m-1
+                  rounded-md
+                  text-xs
+                  font-medium
+                  bg-gray-300
+                  text-gray-800
+                  cursor-pointer
+                "
+              >
+                {{ coinSuggest.Symbol }}
+              </span>
+            </div>
+            <div v-if="tickerError" class="text-sm text-red-600">Такой тикер уже добавлен</div>
           </div>
         </div>
         <button
@@ -242,7 +269,7 @@
 // [x] График сломан если везде одинаковые значения
 // [x] При удалении тикера остается выбор
 
-import { subscribeToTicker, unsubscribeFromTicker } from "./api"
+import { subscribeToTicker, unsubscribeFromTicker, coinListCrypto } from "./api"
 
 export default {
   name: "App",
@@ -256,6 +283,7 @@ export default {
       selectedTicker: null,
 
       graph: [],
+      tickerError: false,
 
       page: 1,
     }
@@ -282,7 +310,7 @@ export default {
         })
       })
     }
-    setInterval(this.updateTickers, 5000)
+    this.saveCoinList()
   },
 
   computed: {
@@ -326,6 +354,13 @@ export default {
   },
 
   methods: {
+    async saveCoinList() {
+      const coinList = JSON.parse(sessionStorage.getItem("coinList"))
+      if (!coinList) {
+        sessionStorage.setItem("coinList", JSON.stringify(await coinListCrypto()))
+      }
+    },
+
     updateTicker(tickerName, price) {
       this.tickers
         .filter(ticker => ticker.name === tickerName)
@@ -359,7 +394,6 @@ export default {
     },
 
     select(ticker) {
-      console.log(ticker)
       this.selectedTicker = ticker
     },
 
@@ -369,6 +403,31 @@ export default {
         this.selectedTicker = null
       }
       unsubscribeFromTicker(tickerToRemove.name)
+    },
+
+    searchHandler() {
+      if (this.tickerError) {
+        this.tickerError = false
+      }
+      this.makeSuggestions()
+    },
+
+    addSuggest(coinSuggest) {
+      this.ticker = coinSuggest.Symbol
+      this.add()
+    },
+
+    makeSuggestions() {
+      if (!this.ticker.trim()) return []
+
+      let coinList = JSON.parse(sessionStorage.getItem("coinList")) || []
+      coinList = Object.values(coinList.Data)
+      coinList = coinList.filter(item =>
+        item.FullName.toLowerCase().includes(this.ticker.trim().toLowerCase())
+      )
+      coinList.splice(4)
+
+      return coinList
     },
   },
 
